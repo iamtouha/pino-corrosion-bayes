@@ -1,0 +1,48 @@
+# Reduced sizes for a smoke run of the whole pipeline (minutes to a few hours, not days).
+tag: quick
+
+dataset:
+  dir: data/quick
+  sizes: {A: 600, B: 600, C: 60, D_pit: 100, D_kl: 100, U: 2000}
+  split: {train: 400, val: 100, test: 100}
+
+dic:
+  fit_filter_cases: 4
+  filter_patterns: 3
+  fit_noise_fields: 2
+  fit_noise_realizations: 6
+
+train:
+  steps: 400
+  lam_r_grid: [0.1]
+  lam_r_select_steps: 0
+  eval_every: 200
+
+study:
+  N: [100, 400]
+  seeds: [0]
+  families: [A]
+
+inference:
+  models: [pino]
+  full_design_cases: 1
+  fe_tmcmc: {n: 300, scale: 0.2, n_mh: 1}
+  n_cases: 4
+  n_zero_delta: 2
+  designs: [grid56, full]
+  surrogate_N: [400]
+  fe_reference_cases: 1
+  tmcmc: {n: 1000, scale: 0.2, n_mh: 2}
+  full_dice_cases: 1
+  nuts: {num_samples: 100, warmup_steps: 100, chains: 2, target_accept: 0.9}
+
+realdata:
+  n_train: 300
+  steps: 600
+  tmcmc_n: 500
+
+capacity:
+  n_ccx: 2
+
+priors:
+  kl: {K_max: 40}       # quick data were generated with this cap

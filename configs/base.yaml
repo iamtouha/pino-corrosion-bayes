@@ -1,0 +1,128 @@
+# Every number used by the pipeline lives here (spec: "never in code").
+# Override with a second YAML (e.g. configs/quick.yaml) via --config base.yaml --config quick.yaml
+seed: 0
+tag: full           # results/<tag>/
+
+geometry:            # Sato & Nishio (2025) free plate between adapters
+  L: 300.0           # mm, loading direction (x)
+  W: 250.0           # mm (y)
+  t0: 3.2            # mm, intact thickness
+  nx: 150            # Q1 elements in x -> 2 mm
+  ny: 125            # Q1 elements in y -> 2 mm
+
+material:
+  E: 206000.0        # MPa
+  nu: 0.30
+  yield: 245.0       # MPa
+  hardening_ratio: 0.01
+  ultimate: 400.0    # MPa, placeholder until the dog-bone test (8b) gives sigma_u
+
+priors:
+  pit: {xc: [50.0, 250.0], yc: [30.0, 220.0], r: [8.0, 50.0], delta: [0.0, 0.15]}
+  nu: [0.27, 0.33]
+  E: [196000.0, 216000.0]
+  kl:
+    ells: [20.0, 40.0]           # mm, correlation lengths in dataset B
+    var_fraction: 0.95
+    K_max: 110                   # cap on kept terms; ell=20 needs 103 for 95 %, ell=40 needs 30
+    dt_max: 0.15                 # max loss as a fraction of t0
+    c: [1.0, 2.5]                # sigmoid offset range -> corroded fraction
+    infer_ell: 40.0              # ell used for KL inference
+  triangle:
+    delta: [0.02, 0.15]
+    size: [30.0, 120.0]          # mm, rough edge length
+
+dataset:
+  dir: data
+  sizes: {A: 5000, B: 5000, C: 300, D_pit: 500, D_kl: 500, U: 20000}
+  split: {train: 4000, val: 500, test: 500}
+  workers: 10
+
+dic:                  # the paper's settings + virtual-DIC rendering
+  px_mm: 0.06
+  subset_radius_px: 60
+  step_px: 20
+  vsg_window_mm: 5.0
+  speckle_sigma_px: 1.2
+  speckle_density: 0.048         # speckles per px^2 (~1e6 over the full FOV)
+  sigma_read: 2.0                # grey levels; tuned in step 3.5
+  roi: {x: [20.0, 280.0], y: [5.0, 245.0]}  # mm; >= 20 mm from the loaded edges
+  grid_56: {nrows: 7, ncols: 8}  # the paper's 56-point design
+  loads_kN: [30.0, 50.0, 80.0]
+  # Step 3 sizes (spec values; quick.yaml cuts them)
+  fit_filter_cases: 50
+  filter_patterns: 4
+  fit_noise_fields: 20
+  fit_noise_realizations: 100
+  calib_load_kN: 80.0
+  calib_radii_px: [30, 60, 90]
+  # Target scatter for 3.5: read off the paper's Fig. 8 histogram. PLACEHOLDER:
+  # +-60 ue at 50 kN treated as ~2 sigma -> 30 ue. Replace with the figure's value.
+  calib_target_std_ue: 30.0
+  crop_mm: [100.0, 200.0, 75.0, 175.0]  # x0, x1, y0, y1 crop for the (cheaper) noise fits
+
+model:
+  deeponet: {p: 128, n_fourier: 64, trunk_width: 128, trunk_layers: 3, branch_width: 256}
+  # padding ~12-14 % chosen so the padded grid is 144 x 168 (FFT-friendly; 142 x 170 has the prime 71)
+  fno: {n_modes: [32, 32], hidden_channels: 64, n_layers: 4, domain_padding: [0.142857, 0.112583]}
+
+train:
+  steps: 60000
+  batch: 16
+  lr: 1.0e-3
+  lr_min: 1.0e-5
+  alpha: 1.0
+  warmup_frac: 0.10
+  lam_r_grid: [0.01, 0.1, 1.0]
+  lam_r_select_steps: 10000      # short runs used to pick lam_r per N on validation
+  lam_r_select_N: null           # null -> select separately for each N (spec)
+  eval_every: 2000
+  amp: false
+
+study:
+  models: [deeponet, fno, pino]
+  N: [100, 500, 2000]
+  seeds: [0, 1, 2]
+  families: [A, B]
+
+inference:
+  sigma_g_rank: 20
+  n_cases: 100
+  n_zero_delta: 10
+  designs: [grid56, full]
+  full_design_cases: 100        # full-field design on the first k cases
+  models: [deeponet, fno, pino]  # surrogate types benchmarked
+  surrogate_N: [100, 2000]
+  fe_reference_cases: 6
+  tmcmc: {n: 4000, scale: 0.2, n_mh: 3}
+  fe_tmcmc: {n: 4000, scale: 0.2, n_mh: 3}
+  nuts: {num_samples: 1000, warmup_steps: 500, chains: 4, target_accept: 0.9}
+  coverage_levels: [0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+  detect_threshold: 0.01
+  full_dice_cases: 10
+  kl_sampler: tmcmc               # tmcmc (batched, GPU) or nuts
+  nugget_floor_frac: 0.1         # likelihood white-noise std >= 0.1 sigma (fitted nugget ~0 -> singular)
+
+capacity:
+  n_samples: 200
+  n_ccx: 20          # CalculiX runs on posterior samples of the deepest case
+
+realdata:            # Step 8a: Zenodo 11257192 (S235 plate with a hole)
+  L: 80.0
+  W: 20.0
+  t0: 3.05
+  nx: 160            # 0.5 mm grid
+  ny: 40
+  hole: [40.0, 10.0, 4.0]          # nominal centre and radius (mm), for the gate only
+  traction: 106.26                 # N/mm^2, arXiv:2405.18311 Sec. 6.1
+  E_ref: 185186.0                  # from K = 128085, G = 73541 (authors' NLS-FEM)
+  nu_ref: 0.2591
+  check_margin_mm: 2.0   # tau representation smears the edge over ~1 cell
+  edge_skip_mm: 2.0
+  bc: clamped                      # the specimen was gripped at x = 0 (authors' model)
+  prior: {xc: [20.0, 60.0], yc: [5.0, 15.0], r: [2.0, 6.0], nu: [0.20, 0.35], E: [150000.0, 230000.0]}
+  n_train: 2000
+  steps: 6000
+  fno_modes: [16, 40]
+  fno_padding: [0.170732, 0.118012]   # 41 -> 48, 161 -> 180 nodes
+  tmcmc_n: 2000

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Generated datasets (regenerate with experiments/step2_dataset.py, ~4 GB)
+data/*.h5
+data/quick/
+data/zenodo_11257192/
+
+# Large or regenerable run outputs
+results/*/step5/ckpt/
+results/*/step7/pit/*.npz
+results/*/step8a/*.pt
+results/*/step8c/ccx/
+results/*/improve/*/posteriors/
+results/*/improve/**/*.npz
+results/quick/
+*.pt
+
+# Logs and Kaggle upload bundles
+logs/
+kaggle/upload*/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
