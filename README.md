@@ -212,3 +212,8 @@ T5 (in progress) adds a 3D solid forward model and surrogates for both faces.
 ## Citation
 
 If you use this code, please cite the paper (reference to be added on publication).
+
+## License
+
+The code is released under the MIT License (see `LICENSE`). The Zenodo dataset used in step 8a
+is not part of this repository and keeps its own license.
