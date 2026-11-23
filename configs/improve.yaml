@@ -1,0 +1,71 @@
+# Improvement runs (follow-up studies, README). Layer on top of laptop.yaml:
+#   --config laptop.yaml --config improve.yaml
+# tag stays "laptop" so the step-5 checkpoints and data/*.h5 are reused; every new output
+# goes under results/laptop/improve/<task>/.
+improve:
+  t1:                       # TMCMC particle count vs derived-quantity (capacity) coverage
+    model: pino
+    N: 2000
+    design: grid56
+    sigma_g: true
+    n_cases: 10             # first n damaged cases of the step-7 pit benchmark (data.npz)
+    runs:                   # (n particles, MH sweeps per stage)
+      - {n: 1000, n_mh: 2}
+      - {n: 4000, n_mh: 3}
+    seed_offsets: [0, 1000] # seed = case index + offset (offset 0 = the step-7 seed)
+    loglik_batch: 16
+    capacity_subsample: 200 # step 8c protocol (capacity.n_samples)
+    sbc:                    # simulation-based calibration with an exact model (surrogate = truth)
+      n_rep: 50              # reduced from 100 for compute (s.e. of a 0.9 coverage: 0.04)
+      seed: 2026
+      n: 1000
+      n_mh: 2
+      near_intact_kN: 1.0   # capacity loss below this counts as near-intact
+
+  t2:                       # Step 8a over-confidence: Sigma_G + model discrepancy
+    n_D: 300                # held-out FE solves of the hole family for Sigma_G (fresh draws)
+    D_seed: 12345
+    sigma_g_rank: 20
+    tmcmc_n: 2000
+    tmcmc_n_mh: 3
+    gp_iters: 2             # empirical-Bayes passes: MAP -> type-II ML hyperparameters -> TMCMC
+    conditions: [iid, iid_SG, taper_SG, GP_SG, GP2_SG, GP2_taper_SG, GP3_SG]
+    gp_ell0: 5.0            # start of the (first) SE length scale for type-II ML, mm
+    gp_ell_long: 30.0       # start of the second SE term (GP2_*: short + long discrepancy), mm
+    gp_ells_3: [1.0, 5.0, 30.0]   # starts of the three SE terms (GP3_*), mm
+
+  t3:                       # Sigma_G regime study: coverage / W1 vs surrogate error / DIC noise
+    n_damaged: 20           # first 20 damaged cases of the step-7 truth set (cases 3..22)
+    designs: [grid56, full]
+    blocks:
+      - {train: B, N: [100, 2000], scales: [1.0]}                     # cross-family surrogate
+      - {train: A, N: [100, 2000], scales: [1.0, 0.333333, 0.1]}      # noise sweep
+    fe_ref_cases: 3         # FE-in-the-loop reference per (noise scale, design)
+    tmcmc: {n: 1000, scale: 0.2, n_mh: 2}      # set from the T1 decision
+    fe_tmcmc: {n: 1000, scale: 0.2, n_mh: 2}
+
+  t5:                       # 3D solid forward model for one-sided corrosion
+    profile:
+      cases: [[0.15, 10.0], [0.15, 30.0], [0.08, 45.0]]   # (delta as fraction of t0, r mm), centred pits
+      nz: [2, 4, 6]         # layers through the thickness (even: mid-plane BC nodes)
+      rtol: [1.0e-10, 1.0e-8, 1.0e-6]
+      chosen: {nz: 4, rtol: 1.0e-8}   # set from the accuracy table before the dataset run
+      workers: [4, 6, 8]
+    sets:                   # name: (size, seed); pit family, same priors as A
+      A3: [2300, 31]        # 2000 train pool + 300 test
+      D3_pit: [300, 34]     # held-out set for Sigma_G
+    workers: 6              # parallel 3D solves (set from the throughput profile / RAM)
+    chunk: 24
+    split: {train: 1850, val: 150, test: 300}   # of A3 (2300)
+    train_steps: 8000
+    infer:
+      n_damaged: 20         # step-7 truth set, damaged cases 3..22 (+ the 3 intact)
+      designs: [grid56, full]
+      ref_cases: 2          # importance-reweighting 3D-FE references per face (grid56)
+      ref_samples: 500      # unique posterior particles re-evaluated with 3D FE per reference
+
+forward:                    # forward-model options (T5)
+  model: membrane2d         # membrane2d (Steps 2-7) | solid3d
+  observed_face: both       # flat (z = 0, intact back face) | corroded (z = t0 tau) | both
+  nz: 4
+  rtol: 1.0e-8
