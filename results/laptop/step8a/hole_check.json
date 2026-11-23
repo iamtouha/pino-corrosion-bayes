@@ -1,0 +1,7 @@
+{
+  "config_hash": "e74dd370c9",
+  "rel_l2_strain_outside": 0.009630875265443255,
+  "max_rel_e11_outside": 0.1113413449022207,
+  "margin_mm": 2.0,
+  "passed": true
+}

@@ -1,0 +1,32 @@
+{
+  "config_hash": "995c59db1f",
+  "sigma_read": 8.010058183377431,
+  "history": [
+    [
+      2.0,
+      12.200720473608081
+    ],
+    [
+      4.91774236855837,
+      19.80223508792471
+    ],
+    [
+      8.83202159555883,
+      32.71065122248635
+    ],
+    [
+      8.010058183377431,
+      29.879197607136913
+    ]
+  ],
+  "scatter_by_radius_ue": {
+    "30": 65.04923833128053,
+    "60": 29.879197607136913,
+    "90": 17.01933874085382
+  },
+  "target_std_ue": 30.0,
+  "ratio_to_target": 0.9959732535712305,
+  "trend_ok": true,
+  "passed": true,
+  "note": "target is a placeholder until read off the paper's Fig. 8 (configs/base.yaml)"
+}
